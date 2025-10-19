@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Origin-View AR (0,0,0 視点)</title>
+  <!-- A-Frame (WebXR) -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <style>
+    html,body{height:100%;margin:0;background:#000}
+    #overlay{
+      position:fixed;inset:0;display:flex;flex-direction:column;gap:8px;
+      padding:12px;pointer-events:none;color:#fff;font-family:system-ui, sans-serif
+    }
+    #overlay .card{
+      pointer-events:auto;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);
+      border-radius:12px;padding:10px;max-width:520px
+    }
+    .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px}
+  </style>
+</head>
+<body>
+  <!-- 画面上オーバーレイ（説明/開始ボタン） -->
+  <div id="overlay">
+    <div class="card">
+      <div style="font-weight:600">原点視点AR（0,0,0）</div>
+      <div style="font-size:14px;opacity:.9">
+        カメラの初期位置＝世界原点(0,0,0)、モデルも原点に固定。<br>
+        つまり「モデルの中心に立って見回す」方式です（タップ配置なし）。
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn" onclick="document.querySelector('a-scene').enterAR();">AR開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-Frame Scene -->
+  <a-scene
+    vr-mode-ui="enabled: false"
+    xr-mode-ui="enabled: true"
+    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
+    webxr="optionalFeatures: dom-overlay,local-floor,anchors,light-estimation; overlayElement: #overlay"
+  >
+    <!-- カメラ（端末の実カメラでトラッキング。WASD無効で見回しのみ） -->
+    <a-entity id="cameraRig">
+      <a-camera wasd-controls-enabled="false" look-controls="touchEnabled: true" near="0.01"></a-camera>
+    </a-entity>
+
+    <!-- 環境光（真っ黒防止） -->
+    <a-entity light="type: ambient; intensity: 0.8"></a-entity>
+    <a-entity light="type: hemisphere; intensity: 0.6; groundColor: #888"></a-entity>
+
+    <!-- モデル読み込み（同じフォルダに 2.glb を置く） -->
+    <a-assets timeout="30000">
+      <a-asset-item id="model" src="./2.glb"></a-asset-item>
+    </a-assets>
+
+    <!-- ★原点固定配置：Blenderで原点/スケールを適用してから書き出し -->
+    <a-entity
+      gltf-model="#model"
+      position="0 0 0"
+      rotation="0 0 0"
+      scale="1 1 1"
+    ></a-entity>
+
+    <!-- デバッグ用：原点マーカー（不要なら削除） -->
+    <a-entity position="0 0 0">
+      <a-ring radius-inner="0.28" radius-outer="0.3" color="#00e0ff" rotation="-90 0 0" opacity="0.7"></a-ring>
+      <a-entity line="start: 0 0 0; end: 1 0 0; color: red"></a-entity>
+      <a-entity line="start: 0 0 0; end: 0 1 0; color: green"></a-entity>
+      <a-entity line="start: 0 0 0; end: 0 0 1; color: blue"></a-entity>
+    </a-entity>
+  </a-scene>
+</body>
+</html>
