@@ -3,73 +3,241 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Origin-View AR (0,0,0 視点)</title>
-  <!-- A-Frame (WebXR) -->
+  <title>Floor-Placement AR (Hit-test)</title>
+  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <style>
-    html,body{height:100%;margin:0;background:#000}
-    #overlay{
-      position:fixed;inset:0;display:flex;flex-direction:column;gap:8px;
-      padding:12px;pointer-events:none;color:#fff;font-family:system-ui, sans-serif
+    html,body{height:100%;margin:0;background:#000;font-family:system-ui,sans-serif}
+    #ui{position:fixed;inset:0;display:flex;flex-direction:column;gap:10px;padding:12px;pointer-events:none;color:#fff}
+    .card{pointer-events:auto;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);border-radius:12px;padding:10px;max-width:560px}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    button, input[type="range"]{
+      appearance:none;border:0;border-radius:10px;padding:10px 14px
     }
-    #overlay .card{
-      pointer-events:auto;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);
-      border-radius:12px;padding:10px;max-width:520px
-    }
-    .btn{appearance:none;border:0;border-radius:10px;padding:10px 14px}
+    .hint{font-size:13px;opacity:.9}
+    .badge{font-size:12px;opacity:.85;border:1px solid #ffffff44;border-radius:999px;padding:3px 8px}
+    #scaleVal{width:3em;display:inline-block;text-align:right}
   </style>
 </head>
 <body>
-  <!-- 画面上オーバーレイ（説明/開始ボタン） -->
-  <div id="overlay">
+  <!-- 画面UI -->
+  <div id="ui">
     <div class="card">
-      <div style="font-weight:600">原点視点AR（0,0,0）</div>
-      <div style="font-size:14px;opacity:.9">
-        カメラの初期位置＝世界原点(0,0,0)、モデルも原点に固定。<br>
-        つまり「モデルの中心に立って見回す」方式です（タップ配置なし）。
+      <div style="font-weight:700">床トラッキングAR（タップで配置）</div>
+      <div class="hint">
+        端末をゆっくり左右に振って床を認識させ、<b>丸いガイド（レティクル）</b>が出たら
+        その位置を<b>タップ</b>してモデルを設置します。2本指ドラッグで位置微調整、ピンチで拡大縮小。
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn" onclick="document.querySelector('a-scene').enterAR();">AR開始</button>
+      <div class="row" style="align-items:center">
+        <button id="startBtn" onclick="document.querySelector('a-scene').enterAR();">AR開始</button>
+        <button id="resetBtn" disabled>リセット</button>
+        <span class="badge" id="status">準備中</span>
+      </div>
+      <div class="row" style="align-items:center">
+        <label>Scale:
+          <input id="scale" type="range" min="0.1" max="5" step="0.01" value="1">
+          <span id="scaleVal">1.00</span>
+        </label>
       </div>
     </div>
   </div>
 
   <!-- A-Frame Scene -->
   <a-scene
-    vr-mode-ui="enabled: false"
-    xr-mode-ui="enabled: true"
-    renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true"
-    webxr="optionalFeatures: dom-overlay,local-floor,anchors,light-estimation; overlayElement: #overlay"
+    renderer="colorManagement:true; physicallyCorrectLights:true; antialias:true"
+    webxr="optionalFeatures: hit-test,dom-overlay,anchors,local-floor,light-estimation; overlayElement: #ui"
+    xr-mode-ui="enabled:true"
+    vr-mode-ui="enabled:false"
+    embedded
   >
-    <!-- カメラ（端末の実カメラでトラッキング。WASD無効で見回しのみ） -->
-    <a-entity id="cameraRig">
-      <a-camera wasd-controls-enabled="false" look-controls="touchEnabled: true" near="0.01"></a-camera>
+    <!-- カメラ -->
+    <a-entity id="rig">
+      <a-camera wasd-controls-enabled="false" look-controls="touchEnabled:true" near="0.01"></a-camera>
     </a-entity>
 
-    <!-- 環境光（真っ黒防止） -->
-    <a-entity light="type: ambient; intensity: 0.8"></a-entity>
-    <a-entity light="type: hemisphere; intensity: 0.6; groundColor: #888"></a-entity>
+    <!-- 光（真っ黒防止） -->
+    <a-entity light="type:ambient; intensity:0.9"></a-entity>
+    <a-entity light="type:hemisphere; intensity:0.7; groundColor:#777"></a-entity>
 
-    <!-- モデル読み込み（同じフォルダに 2.glb を置く） -->
-    <a-assets timeout="30000">
+    <!-- アセット -->
+    <a-assets timeout="60000">
       <a-asset-item id="model" src="./2.glb"></a-asset-item>
     </a-assets>
 
-    <!-- ★原点固定配置：Blenderで原点/スケールを適用してから書き出し -->
-    <a-entity
-      gltf-model="#model"
-      position="0 0 0"
-      rotation="0 0 0"
-      scale="1 1 1"
-    ></a-entity>
-
-    <!-- デバッグ用：原点マーカー（不要なら削除） -->
-    <a-entity position="0 0 0">
-      <a-ring radius-inner="0.28" radius-outer="0.3" color="#00e0ff" rotation="-90 0 0" opacity="0.7"></a-ring>
-      <a-entity line="start: 0 0 0; end: 1 0 0; color: red"></a-entity>
-      <a-entity line="start: 0 0 0; end: 0 1 0; color: green"></a-entity>
-      <a-entity line="start: 0 0 0; end: 0 0 1; color: blue"></a-entity>
+    <!-- 設置されるコンテナ（初期は非表示） -->
+    <a-entity id="placedRoot" visible="false"
+              gesture-controls
+              gltf-model="#model"
+              scale="1 1 1"
+              rotation="0 0 0">
     </a-entity>
+
+    <!-- レティクル（床ガイド） -->
+    <a-entity id="reticle" visible="false" rotation="-90 0 0">
+      <a-ring radius-inner="0.08" radius-outer="0.1" color="#00e0ff" opacity="0.9"></a-ring>
+      <a-entity line="start: 0 0 0; end: 0 0.2 0; color: #00e0ff"></a-entity>
+    </a-entity>
+
+    <!-- ====== スクリプト：hit-test / 配置 / 操作 ====== -->
+    <script>
+      // 簡易ジェスチャ（ピンチ拡大縮小・2本指ドラッグで平行移動）
+      AFRAME.registerComponent('gesture-controls', {
+        init() {
+          const el=this.el;
+          let lastDist=null;
+          let twoFinger=false;
+          let startX=0,startZ=0, startTouches=null;
+
+          const getXZ = (dx,dy,cam) => {
+            // 画面平行でざっくり動かす（屋外道路なら十分）
+            const s=0.002; // 感度
+            // カメラ向きに合わせて左右/前後へ
+            const rotY = (cam.object3D.rotation.y);
+            const cos=Math.cos(rotY), sin=Math.sin(rotY);
+            const rightX =  cos, rightZ = -sin;
+            const fwdX   =  sin, fwdZ  =  cos;
+            return {x: dx*s*rightX + dy*s*fwdX, z: dx*s*rightZ + dy*s*fwdZ};
+          };
+
+          this.onTouchMove = (e)=>{
+            if(!twoFinger || e.touches.length!==2) return;
+            const cam=document.querySelector('a-camera');
+            const t=e.touches;
+            // 平行移動
+            const dx=((t[0].clientX + t[1].clientX)/2 - (startTouches[0].clientX+startTouches[1].clientX)/2);
+            const dy=((t[0].clientY + t[1].clientY)/2 - (startTouches[0].clientY+startTouches[1].clientY)/2);
+            const delta=getXZ(dx, -dy, cam);
+            el.object3D.position.set(startX+delta.x, el.object3D.position.y, startZ+delta.z);
+
+            // スケール（ピンチ）
+            const d=Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+            if(lastDist!==null){
+              const scale=el.object3D.scale.x * (d/lastDist);
+              el.object3D.scale.setScalar(Math.min(5, Math.max(0.1, scale)));
+              document.getElementById('scale').value = el.object3D.scale.x.toFixed(2);
+              document.getElementById('scaleVal').innerText = Number(el.object3D.scale.x).toFixed(2);
+            }
+            lastDist=d;
+          };
+
+          this.onTouchStart = (e)=>{
+            if(e.touches.length===2){
+              twoFinger=true; lastDist=null;
+              startTouches=[...e.touches];
+              startX=el.object3D.position.x; startZ=el.object3D.position.z;
+            }
+          };
+          this.onTouchEnd = ()=>{ twoFinger=false; lastDist=null; };
+
+          window.addEventListener('touchstart', this.onTouchStart, {passive:true});
+          window.addEventListener('touchmove', this.onTouchMove, {passive:false});
+          window.addEventListener('touchend', this.onTouchEnd, {passive:true});
+        }
+      });
+
+      // Hit-test & 配置ロジック
+      AFRAME.registerComponent('ar-placement', {
+        init() {
+          const sceneEl = this.el.sceneEl;
+          const reticle = document.getElementById('reticle');
+          const placed  = document.getElementById('placedRoot');
+          const status  = document.getElementById('status');
+          const resetBtn= document.getElementById('resetBtn');
+          const scaleUI = document.getElementById('scale');
+          const scaleVal= document.getElementById('scaleVal');
+
+          let hitTestSource=null, viewerSpace=null, localSpace=null, anchor=null;
+
+          // AR開始時に WebXR hit-test を初期化
+          sceneEl.addEventListener('enter-vr', async ()=>{
+            if(!sceneEl.is('ar-mode')) return;
+            const xr=sceneEl.renderer.xr;
+            const session=xr.getSession();
+            status.textContent='床をスキャン中…';
+
+            // リファレンス空間
+            viewerSpace = await session.requestReferenceSpace('viewer');
+            localSpace  = await session.requestReferenceSpace('local-floor').catch(()=>session.requestReferenceSpace('local'));
+
+            // hit-test source
+            hitTestSource = await session.requestHitTestSource({space: viewerSpace});
+
+            // フレーム毎にレティクル更新
+            xr.addEventListener('sessionstart', ()=>{
+              reticle.object3D.visible=false;
+              sceneEl.renderer.setAnimationLoop((t, frame)=>{
+                if(!frame || !hitTestSource) return;
+                const results = frame.getHitTestResults(hitTestSource);
+                if(results.length){
+                  const pose = results[0].getPose(localSpace);
+                  reticle.object3D.matrix.fromArray(pose.transform.matrix);
+                  reticle.object3D.matrix.decompose(reticle.object3D.position, reticle.object3D.quaternion, reticle.object3D.scale);
+                  reticle.object3D.visible = !placed.getAttribute('visible'); // 置いた後は隠す
+                  status.textContent = placed.getAttribute('visible') ? '配置済み' : 'タップで配置';
+                } else {
+                  reticle.object3D.visible=false;
+                  if(!placed.getAttribute('visible')) status.textContent='床をスキャン中…';
+                }
+              });
+            });
+
+            // タップで配置
+            const onTap = async (e)=>{
+              if(!reticle.object3D.visible) return;
+              // アンカー対応端末なら固定
+              const frame = xr.getFrame();
+              const refSpace = localSpace;
+              try{
+                const anchorPose = new XRRigidTransform(
+                  {x:reticle.object3D.position.x, y:reticle.object3D.position.y, z:reticle.object3D.position.z},
+                  {x:reticle.object3D.quaternion.x,y:reticle.object3D.quaternion.y,z:reticle.object3D.quaternion.z,w:reticle.object3D.quaternion.w}
+                );
+                if (frame.createAnchor) {
+                  anchor = await frame.createAnchor(anchorPose, refSpace);
+                  anchor.context = placed.object3D; // 追従対象
+                }
+              }catch(_e){ /* anchors 未対応でも続行 */ }
+
+              placed.object3D.position.copy(reticle.object3D.position);
+              placed.object3D.quaternion.copy(reticle.object3D.quaternion);
+              placed.setAttribute('visible', true);
+              reticle.object3D.visible=false;
+              resetBtn.disabled=false;
+              status.textContent='配置済み';
+            };
+            sceneEl.canvas.addEventListener('touchend', onTap);
+            sceneEl.canvas.addEventListener('click', onTap); // デスクトップ検証用
+
+            // リセット
+            resetBtn.onclick = ()=>{
+              placed.setAttribute('visible', false);
+              resetBtn.disabled=true;
+              status.textContent='床をスキャン中…';
+              reticle.object3D.visible=true;
+            };
+
+            // スケールUI
+            scaleUI.addEventListener('input', ()=>{
+              const s=parseFloat(scaleUI.value);
+              placed.object3D.scale.setScalar(s);
+              scaleVal.textContent=s.toFixed(2);
+            });
+          });
+
+          sceneEl.addEventListener('exit-vr', ()=>{
+            status.textContent='終了';
+          });
+        }
+      });
+
+      // シーンに付与
+      document.addEventListener('DOMContentLoaded', ()=>{
+        document.querySelector('a-scene').setAttribute('ar-placement','');
+        const scale = document.getElementById('scale');
+        const scaleVal = document.getElementById('scaleVal');
+        scale.addEventListener('input', ()=> scaleVal.textContent = parseFloat(scale.value).toFixed(2));
+      });
+    </script>
   </a-scene>
 </body>
 </html>
